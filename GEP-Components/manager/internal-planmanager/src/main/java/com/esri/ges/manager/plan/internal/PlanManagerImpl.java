@@ -15,6 +15,7 @@ import com.esri.ges.core.property.PropertyException;
 import com.esri.ges.manager.alerts.AlertsManager;
 import com.esri.ges.manager.autoarrivaldeparture.AutoArrivalDepartureManager;
 import com.esri.ges.manager.geoeventdefinition.GeoEventDefinitionManager;
+import com.esri.ges.manager.messages.MessagesManager;
 import com.esri.ges.manager.plan.PlanManager;
 import com.esri.ges.manager.routemonitor.util.PlanStatus;
 import com.esri.ges.manager.routes.Plan;
@@ -53,6 +54,7 @@ public class PlanManagerImpl implements PlanManager
   private String planCommandGEDName;
   private StreamManager streamManager;
   private String planInputName;
+  private MessagesManager messagesManager;
 
   @Override
   public GeoEventDefinition getPlanCommandGeoEventDefinition()
@@ -61,12 +63,17 @@ public class PlanManagerImpl implements PlanManager
   }
 
   @Override
-  public GeoEvent clearPlan(GeoEvent geoEvent, String agsConnectionName, String path, String featureService, String stopLayer, String routeLayer, String vehicleLayer, String geofenceLayer, String alertLayer)
+  public GeoEvent clearPlan(GeoEvent geoEvent, String agsConnectionName, 
+		  String path, String featureService, String stopLayer, 
+		  String routeLayer, String vehicleLayer, String geofenceLayer, 
+		  String alertLayer, String messagesLayer)
   {
+	routeManager.clearAllRouteFeatures(agsConnectionName, path, featureService, routeLayer);  
     stopsManager.clearAllStops(agsConnectionName, path, featureService, stopLayer, geofenceLayer);
-    routeManager.clearAllRouteFeatures(agsConnectionName, path, featureService, routeLayer);
+    
     vehiclesManager.clearAllVehicleFeatures(agsConnectionName, path, featureService, vehicleLayer);
     alertsManager.clearAllAlertFeatures(agsConnectionName, path, featureService, alertLayer);
+    messagesManager.clearAllMessageFeatures(agsConnectionName, path, featureService, messagesLayer);
     autoArrivalDepartureManager.clearIncidents();
 
     GeoEvent newGeoEvent = (GeoEvent) geoEvent.clone(null);
@@ -246,6 +253,10 @@ public class PlanManagerImpl implements PlanManager
     return ACTION_RELOAD;
   }
 
+  public void setMessagesManager(MessagesManager messagesManager)
+  {
+	  this.messagesManager = messagesManager;
+  }
   public void setStopsManager(StopsManager stopsManager)
   {
     this.stopsManager = stopsManager;

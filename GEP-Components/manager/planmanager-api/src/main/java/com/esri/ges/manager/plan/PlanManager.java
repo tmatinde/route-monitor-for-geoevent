@@ -11,7 +11,7 @@ public interface PlanManager
   public String getPlanCommandActionGet();
   public String getPlanCommandActionLoad();
   public String getPlanCommandActionReload();
-  public GeoEvent clearPlan(GeoEvent geoEvent, String agsConnectionName, String path, String featureService, String stopLayer, String routeLayer, String vehicleLayer, String geofenceLayer, String alertLayer);
+  public GeoEvent clearPlan(GeoEvent geoEvent, String agsConnectionName, String path, String featureService, String stopLayer, String routeLayer, String vehicleLayer, String geofenceLayer, String alertLayer, String messagesLayer);
   public GeoEvent getPlan();
   public GeoEvent reloadPlan(String agsConnection, String Folder, String featureService, String stopLayer, String routeLayer, String vehicleLayer, String alertLayer);
   public GeoEvent loadPlan(GeoEvent geoEvent); 

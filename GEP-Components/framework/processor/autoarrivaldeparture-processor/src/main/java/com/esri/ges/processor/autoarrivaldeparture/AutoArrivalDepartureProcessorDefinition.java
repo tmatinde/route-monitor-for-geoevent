@@ -21,7 +21,7 @@ public class AutoArrivalDepartureProcessorDefinition extends GeoEventProcessorDe
     try
     {
       GeoEventDefinition md = new DefaultGeoEventDefinition();
-      md.setName("incident");
+      md.setName("AutoArrivalProcessorIncident");
       List<FieldDefinition> ads = new ArrayList<FieldDefinition>();
       ads.add(new DefaultFieldDefinition("id", FieldType.String));
       ads.add(new DefaultFieldDefinition("name", FieldType.String));
@@ -41,6 +41,14 @@ public class AutoArrivalDepartureProcessorDefinition extends GeoEventProcessorDe
       ads.add(new DefaultFieldDefinition("dismissed", FieldType.Boolean));
       ads.add(new DefaultFieldDefinition("assignedTo", FieldType.String));
       ads.add(new DefaultFieldDefinition("note", FieldType.String));
+      md.setFieldDefinitions(ads);
+      geoEventDefinitions.put(md.getName(), md);
+      
+      md = new DefaultGeoEventDefinition();
+      md.setName("next-stop");
+      ads = new ArrayList<FieldDefinition>();
+      ads.add(new DefaultFieldDefinition("stopId", FieldType.String));
+      ads.add(new DefaultFieldDefinition("name", FieldType.String));
       md.setFieldDefinitions(ads);
       geoEventDefinitions.put(md.getName(), md);
     }

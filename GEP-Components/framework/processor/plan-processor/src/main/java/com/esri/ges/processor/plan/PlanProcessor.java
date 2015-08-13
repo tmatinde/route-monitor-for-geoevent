@@ -24,6 +24,7 @@ public class PlanProcessor extends GeoEventProcessorBase
   private String vehicleLayer;
   private String geofenceLayer;
   private String alertLayer;
+  private String messagesLayer;
   
   public PlanProcessor(GeoEventProcessorDefinition definition, PlanManager planManager) throws ComponentException
   {
@@ -45,7 +46,7 @@ public class PlanProcessor extends GeoEventProcessorBase
     if(!geoEvent.getGeoEventDefinition().getName().equals(planManager.getPlanCommandGeoEventDefinition().getName()))
       return null;
     if(geoEvent.getField(planManager.getPlanCommandActionField()).equals(planManager.getPlanCommandActionClear()))
-      newGeoEvent = planManager.clearPlan(geoEvent, agsConnectionName, path, featureService, stopLayer, routeLayer, vehicleLayer, geofenceLayer, alertLayer);
+      newGeoEvent = planManager.clearPlan(geoEvent, agsConnectionName, path, featureService, stopLayer, routeLayer, vehicleLayer, geofenceLayer, alertLayer, messagesLayer);
     else if(geoEvent.getField(planManager.getPlanCommandActionField()).equals(planManager.getPlanCommandActionGet()))
       newGeoEvent = planManager.getPlan();
     else if(geoEvent.getField(planManager.getPlanCommandActionField()).equals(planManager.getPlanCommandActionReload()))
@@ -82,6 +83,8 @@ public class PlanProcessor extends GeoEventProcessorBase
       geofenceLayer = getProperty(PlanDefinition.GEOFENCE_LAYER_INDEX_PROPERTY).getValueAsString();
     if (hasProperty(PlanDefinition.ALERT_LAYER_INDEX_PROPERTY))
       alertLayer = getProperty(PlanDefinition.ALERT_LAYER_INDEX_PROPERTY).getValueAsString();
+    if (hasProperty(PlanDefinition.MESSAGES_LAYER_INDEX_PROPERTY))
+    	messagesLayer = getProperty(PlanDefinition.MESSAGES_LAYER_INDEX_PROPERTY).getValueAsString();
   }
 
 }

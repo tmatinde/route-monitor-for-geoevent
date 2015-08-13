@@ -169,6 +169,7 @@ public class StopsManagerImpl implements StopsManager
   @Override
   public Stop addOrReplaceStop(Stop stop)
   {
+	log.info("add or Replace a stop" + stop);
     if(stop.getType().equals(NonServiceStopType.Break.toString()) && stop.getStatus() != StopStatus.Canceled)
     {
       DefaultStop defaultStop = new DefaultStop(stop);
@@ -263,6 +264,7 @@ public class StopsManagerImpl implements StopsManager
         stopsForRoute.add( insertIndex, stopToInsert );
       }
     }
+    log.info("Inserting Stop" + stopToInsert);
     stopsByStopName.put( stopToInsert.getName(), stopToInsert );
     stopToRouteNameMap.put( stopToInsert.getName(), stopToInsert.getRouteName() );
     return stopToInsert;
@@ -574,6 +576,7 @@ public class StopsManagerImpl implements StopsManager
 
   public GeoEvent createGeoEvent2(Stop stop, String ownerId, Uri uri)
   {
+	log.info("Creating geovent for stop = " + stop);
     try
     {
       GeoEvent geoEvent = geoEventCreator.create(stopGEDName, stopGEDOwner);
@@ -636,6 +639,7 @@ public class StopsManagerImpl implements StopsManager
       for( String stopName : stopNames )
       {
         stop = stopsByStopName.get( stopName );
+        log.info("Unassigning stop " + stop);
         if( stop != null )
         {
           newStop = new DefaultStop( stop );
@@ -757,7 +761,7 @@ public class StopsManagerImpl implements StopsManager
   public List<Stop> reloadStops(String agsConnectionName, String path, String featureService, String layer)
   {
     removeAllStops();
-    
+    log.info("Reloading stops from featuer service");
     ArcGISServerConnection agsConnection = agsConnectionManager.getArcGISServerConnection(agsConnectionName);
     Layer lyr =  agsConnection.getLayer(path, featureService, layer, ArcGISServerType.FeatureServer);
     //getAllFeatures(String folder, String serviceName, int layerIndex, String queryDefinition, String outFields, boolean includeGeometry, ArcGISServerType serverType, long lastOid)

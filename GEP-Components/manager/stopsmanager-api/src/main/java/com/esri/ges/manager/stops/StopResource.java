@@ -84,6 +84,13 @@ public class StopResource extends ResourceBackedAttributeMap implements Stop
     if(stop.getType() !=null)
       setType(stop.getType());
     setDoubleAttribute( resource, CUMULATIVE_MINUTES_KEY, stop.getCumulativeMinutes());
+    Set<String> keys = getPredefinedKeys();
+    for( String key : stop.getAttributeKeys()) {
+      if(!keys.contains(key) ) {
+	  	  String value = stop.getAttribute(key);
+	  	  setAttribute( resource, key, value);
+      }
+    }
   }
   
   
@@ -403,6 +410,7 @@ public class StopResource extends ResourceBackedAttributeMap implements Stop
   public String toString()
   {
     StringBuffer sb = new StringBuffer();
+    sb.append("StopResource = ");
     sb.append(getRouteName());
     sb.append("/");
     sb.append(getName());
@@ -429,6 +437,10 @@ public class StopResource extends ResourceBackedAttributeMap implements Stop
       sb.append("/"+DF.format(getProjectedDeparture()));
     if (getActualDeparture() != null)
       sb.append("/"+DF.format(getActualDeparture()));
+    for( String key : this.getAttributeKeys()) {
+    	  String value = this.getAttribute(key);
+    	  sb.append("k=" + key + ",v=" + value );
+    }
     return sb.toString();
   }
 

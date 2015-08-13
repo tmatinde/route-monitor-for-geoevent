@@ -6,6 +6,8 @@
     <reference id="vehiclesManagerService" interface="com.esri.ges.manager.vehicles.VehiclesManager" />
     <reference id="alertsManagerService" interface="com.esri.ges.manager.alerts.AlertsManager" />
     <reference id="messagingService" interface="com.esri.ges.messaging.Messaging"/>
+    <reference id="messagesManagerService" interface="com.esri.ges.manager.messages.MessagesManager"/>
+    
 	<reference id="autoArrivalDepartureManagerService" interface="com.esri.ges.manager.autoarrivaldeparture.AutoArrivalDepartureManager"/>
     
     <cm:property-placeholder persistent-id="com.esri.ges.manager.plan">
@@ -24,6 +26,7 @@
         <property name="routeManager" ref="routeManagerService" />
         <property name="vehiclesManager" ref="vehiclesManagerService" />
         <property name="alertsManager" ref="alertsManagerService" />
+        <property name="messagesManager" ref="messagesManagerService" />
         <property name="messaging" ref="messagingService" />
         <property name="planCommandGEDName" value="${com.esri.ges.manager.plan.plancommandgeoeventdefinitionname}" />
 <!--         <property name="planGEDName" value="${com.esri.ges.manager.plan.plangeoeventdefinitionname}" /> -->

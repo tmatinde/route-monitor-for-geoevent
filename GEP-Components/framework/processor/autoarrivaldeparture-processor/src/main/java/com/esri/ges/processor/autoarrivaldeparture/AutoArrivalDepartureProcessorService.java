@@ -6,6 +6,7 @@ import com.esri.ges.manager.incident.IncidentManager;
 import com.esri.ges.manager.routes.RouteManager;
 import com.esri.ges.manager.stops.StopsManager;
 import com.esri.ges.manager.vehicles.VehiclesManager;
+import com.esri.ges.messaging.Messaging;
 import com.esri.ges.processor.GeoEventProcessor;
 import com.esri.ges.processor.GeoEventProcessorServiceBase;
 import com.esri.ges.registry.condition.ConditionRegistry;
@@ -17,6 +18,7 @@ public class AutoArrivalDepartureProcessorService extends GeoEventProcessorServi
   private RouteManager routeManager;
   private ConditionRegistry conditionRegistry;
   private AutoArrivalDepartureManager autoArrivalDepartureManager;
+  private Messaging messaging;
  
   public AutoArrivalDepartureProcessorService()
   {
@@ -26,7 +28,9 @@ public class AutoArrivalDepartureProcessorService extends GeoEventProcessorServi
   @Override
   public GeoEventProcessor create() throws ComponentException
   {
-    return new AutoArrivalDepartureProcessor(definition, stopsManager, routeManager, vehiclesManager, conditionRegistry, autoArrivalDepartureManager);
+    return new AutoArrivalDepartureProcessor(definition, stopsManager, 
+    		routeManager, vehiclesManager, conditionRegistry, 
+    		autoArrivalDepartureManager, this.messaging);
   }
 
   public void setStopsManager(StopsManager stopsManager)
@@ -53,6 +57,13 @@ public class AutoArrivalDepartureProcessorService extends GeoEventProcessorServi
   {
     this.autoArrivalDepartureManager = autoArrivalDepartureManager;
   }
+  
+  public void setMessaging(Messaging messaging)
+  {
+    this.messaging = messaging;
+  }
+
+ 
 
   
 }

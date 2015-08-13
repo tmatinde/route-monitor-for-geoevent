@@ -1,7 +1,11 @@
 package com.esri.ges.manager.routes.internal;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -11,9 +15,27 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPInputStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpHeaders;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.client.methods.HttpRequestBase;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicHeader;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.params.HttpConnectionParams;
+import org.apache.http.params.HttpParams;
+import org.apache.http.util.EntityUtils;
 import org.codehaus.jackson.JsonFactory;
 import org.codehaus.jackson.JsonNode;
 import org.codehaus.jackson.JsonParser;
@@ -76,16 +98,31 @@ public class NetworkAnalystServerConnection
     }
     try
     {
-      URL url = new URL( urlString.toString() );
+      Iterator<KeyValue> iter = params.iterator();
+      String get = "";
+      while(iter.hasNext()) {
+    	  KeyValue kv = iter.next();
+    	  get += kv.getKey() + "=" + URLEncoder.encode(kv.getValue(), "UTF-8") + '&';
+      }
+      URL url = new URL( urlString.toString() + "?" + get);
       //localhttp = new Http();
-      
-      String reply = http.post(url, params, defaultTimeout );
-      
+      //params.to
+      //String reply = http.post(url, params, defaultTimeout );
+      String reply = this.createHttpRequest
+    		  (url.toExternalForm(), 
+    	      "get", 
+    	      null, 
+    	      null, 
+    	      "text/plain", 
+    	      get, 
+    	      defaultTimeout);
+      log.info("url=" + url.toExternalForm() + ", request = "+ get);
+      log.debug("reply = "+ reply);
       if( reply != null )
       {
         return parseRouteSolverReply( reply );
       }
-      log.error( "Did not get back a valid response from NA solve call." );
+      log.error( "Did not get back a valid response from NA solve call. (response = null)" );
     }
     catch( Exception e )
     {
@@ -109,7 +146,7 @@ public class NetworkAnalystServerConnection
     }
     catch( Exception e )
     {
-      throw new RuntimeException( e );
+      throw new RuntimeException("Error parsing route solve reply",  e );
     }
     return solvedRoute;
   }
@@ -323,6 +360,98 @@ public class NetworkAnalystServerConnection
     }
     return geomString;
   }
+  
+  public String createHttpRequest(
+	     
+	      String url, 
+	      String method, 
+	      String clientParameters, 
+	      String acceptableMimeClient, 
+	      String postBodyType, 
+	      String postBody, 
+	      int timeOut) throws Exception {
+	    
+	   /* if(timeOut < 1) {
+	      timeOut = 1000 * 60 * 60;
+	    } else {
+	      timeOut = timeOut * 1000;
+	    }*/
+	    
+	    int connectiontimeout = timeOut; //1 second
+	    int sockettimeout = timeOut;
+
+	    HttpParams httpparameters = new BasicHttpParams();
+
+	    HttpConnectionParams.setConnectionTimeout(httpparameters, connectiontimeout);
+	    HttpConnectionParams.setSoTimeout(httpparameters, sockettimeout * 10);
+
+	    HttpClient httpClient = new DefaultHttpClient(httpparameters);
+
+	  
+	    HttpRequestBase request = null;
+	    
+	    if(Val.chkStr(method).toLowerCase().equals("get")) {
+	      request = new HttpGet(url);
+	      
+	    } else {
+	      request = new HttpPost(url);
+	      HttpEntity entity = new StringEntity(postBody);
+	      ((HttpPost) request).setEntity(entity);
+	      request.setHeader(HttpHeaders.CONTENT_TYPE,postBodyType);
+	    }
+	   // request.setConfig(requestConfig);
+	    request.setHeader(new BasicHeader("User-Agent", "ESRI - HRSD - Client"));
+	    log.info("Sending request to " + url);
+	    HttpResponse response = httpClient.execute(request);
+	    //context.setHttpRequest(request);
+	    if(response == null) {
+	      log.error("response = null from " + url + "postbody = " + postBody);
+	    } else {
+	    	return readResponseBody(response);
+	    }
+	    //context.setHttpResponse(response);
+	    return "";
+	 
+	  }
+  
+  public String readResponseBody(HttpResponse response) throws Exception {
+	    HttpEntity entity = response.getEntity();
+	    byte output[] = null;
+	    if (entity != null) {
+	      if (entity.getContentEncoding() != null) {
+	        if (entity.getContentEncoding().getValue().equals("gzip")) {
+	          output = unpackRaw(EntityUtils.toByteArray(entity));
+	        } else {
+	          output = EntityUtils.toByteArray(entity);
+	        }
+	      } else {
+	        output = EntityUtils.toByteArray(entity);
+	      }
+	    }
+	    return new String(output);
+  }
+  
+  private byte[] unpackRaw(byte[] b) throws IOException {
+	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	    ByteArrayInputStream bais = new ByteArrayInputStream(b);
+
+	    GZIPInputStream zis = new GZIPInputStream(bais);
+	    try {
+	      byte[] tmpBuffer = new byte[256];
+	      int n;
+	      while ((n = zis.read(tmpBuffer)) >= 0) {
+	        baos.write(tmpBuffer, 0, n);
+	      }
+	    } finally {
+	      try {
+	        zis.close();
+	      } catch (Throwable e) {
+	        log.error("Error closing in unpack raw", e);
+	      }
+	    }
+
+	    return baos.toByteArray();
+	  }
   
   public class CustomComparator implements Comparator<Location> 
   {

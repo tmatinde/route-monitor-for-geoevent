@@ -1,4 +1,4 @@
-package com.esri.ges.processor.stopProcessor;
+ package com.esri.ges.processor.stopProcessor;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,6 +56,7 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
     super.setId(id);
     destination = new EventDestination(getId() + ":event");
     geoEventProducer = messaging.createGeoEventProducer(destination.getName());
+  
   }
 
   @Override
@@ -95,18 +96,20 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
     StopStatus newStatus = StopStatus.valueOf(newStatusStr);
     int newScheduledDuration = geoEvent.getField( "SCHEDULED_SERVICE_DURATION" )==null?-1:(Integer)geoEvent.getField( "SCHEDULED_SERVICE_DURATION" );
     int newSequenceNumber = geoEvent.getField( "SEQUENCE_NUMBER" )==null?-1:(Integer)geoEvent.getField( "SEQUENCE_NUMBER" );
-    
+    LOG.info("Processing new or updated stops = " + stopName );
     if(stop==null)
     {
+      LOG.info("stop is null stopname = " + stopName );
       if(newStatus==StopStatus.Unassigned)
       {
+        LOG.info("stop new status is unassigned = " + stopName );
         stop = stopsManager.createStop(stopName);
         stopsManager.convertGeoEventToStop(geoEvent, stop);
         DefaultStop defaultStop = new DefaultStop(stop);
         defaultStop.setRouteName(stopsManager.getUnassignedRouteName());
         defaultStop.setSequenceNumber(0);
         stop = defaultStop;
-
+        LOG.info("new stop adding unassigned = " + stopName );
         Stop updatedStop = stopsManager.addOrReplaceStop(stop);
       
         // Inserting unassigned stops
@@ -114,6 +117,7 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
       }
       else
       {
+        LOG.info("stop is not unassigned stopname = " + stopName );
         // Inserting assigned stops
 //        String routeName = updatedStop.getRouteName();
         DefaultStop newDefaultStop = new DefaultStop();
@@ -123,12 +127,15 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
         newDefaultStop.setRouteName(routeName);
         Stop newstop = new DefaultStop(newDefaultStop);
         String errorMessage = validateSequenceChange(newstop, newSequenceNumber);
+        LOG.info("Error message" + errorMessage + "stopname = " + stopName );
         if(errorMessage.length()==0)
         {
+          LOG.info("addomgnew stop adding assigned = " + stopName ); 
           stop = stopsManager.createStop(stopName);
           stopsManager.convertGeoEventToStop(geoEvent, stop);
           Stop updatedStop = stopsManager.addOrReplaceStop(stop);
           boolean optimize = updatedStop.getSequenceNumber()==null;
+          LOG.info("Updating route = " + stopName + " routeName = " + routeName );
           updateRoute(routeName, optimize, true, requestId);
         }
         else
@@ -141,17 +148,21 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
     {
       // Updating existing stops
 //      String routeName = stop.getRouteName();
-      StopStatus previoudStatus = stop.getStatus();
+      LOG.info("updating existing stop = " + stopName );
+      StopStatus previousStatus = stop.getStatus();
       int previousSequence = stop.getSequenceNumber();
       int previousDuration = stop.getScheduledServiceDuration();
-      String routeNameOfCanceledStop = getRouteOfCanceledStop(stop.getName());
+      String routeNameOfStop = getRouteOfStop(stop.getName());
+      
       int sequenceOfCanceledStop = getSequenceNumberOfCanceledStop(stop.getName());
 
-      if(newStatus == previoudStatus)
+      if(newStatus == previousStatus)
       {
+        LOG.info("newstatus == previoudStatus == " + previousStatus  + " "+ stopName);
         // If status is canceled, we don't need to update it.
         if(newStatus != StopStatus.Canceled)
         {
+          LOG.info("newstatus != canceled " + " "+ stopName );
           if( (newScheduledDuration > 0 && previousDuration != newScheduledDuration) || (newSequenceNumber >= 0 && previousSequence != newSequenceNumber) )
           {
             // This is the case for stop duration or sequence updates.
@@ -175,16 +186,45 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
       }
       else
       {
+        LOG.info("newstatus is not equal  to old status" + previousStatus );
         stopsManager.convertGeoEventToStop(geoEvent, stop);
-        if(previoudStatus == StopStatus.Dispatched && stop.getStatus() == StopStatus.AtStop)
+        
+        if(previousStatus == StopStatus.AtStop && 
+        		stop.getStatus() == StopStatus.Dispatched) {
+        	// T.M. Added to accomadate new FWW workflow
+        	LOG.info("From at stop to dispatched " + stopName);
+            updateStop(stop);
+        }
+        if(previousStatus == StopStatus.Dispatched && stop.getStatus() == StopStatus.AtStop)
         {
           // This is the case for arriving
           if(stop.getActualArrival()==null)
             stop.setActualArrival(stop.getLastUpdated());
+          
+          LOG.info("Updating stop previous status is dispatched and current stop status at stop " + stopName);
           updateStop(stop);
         }
-        if(previoudStatus == StopStatus.AtStop && (stop.getStatus() == StopStatus.Completed || stop.getStatus() == StopStatus.Exception))
+        if(/*previousStatus == StopStatus.AtStop && T.M.  Removed this because sometimes it is set by the dispatcher*/
+           (stop.getStatus() == StopStatus.Completed || stop.getStatus() == StopStatus.Exception))
         {
+          if(!stop.getType().equals(NonServiceStopType.Base.toString())) {
+        	  // TM: Added so that base is set to completed automatically.  Needed for re-sequencing
+        	  // so that completed stop does not go on-top of base stop
+        	  LOG.info("Testing if base stop for this route has been completed");
+        	  List<Stop> stops = this.stopsManager.getStopsByRouteName(stop.getRouteName());
+        	  for(Stop rStop : stops) {
+        		  if(rStop.getType().equals(NonServiceStopType.Base.toString())) {
+        			  if(!(rStop.getStatus().equals(StopStatus.Completed) || rStop.getStatus().equals(StopStatus.Exception))) {
+        				  LOG.info("Setting base stop to completed automatically");
+        				  rStop.setStatus(StopStatus.Completed);
+        				  updateStop(rStop);
+        			  }
+        			  LOG.info("Finished testing base stop");
+        			  break;
+        		  }
+        	  }
+          }
+         
           // This is the case for completing or exception
           if(stop.getActualDeparture() == null)
           {
@@ -200,10 +240,12 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
           }
 //          Vehicle vehicle = vehiclesManager.getVehicleByName( stop.getRouteName() );
 //          vehicle.setNextStopSequenceNumber( stop.getSequenceNumber()+1 );
+          LOG.info("new status is completed or status is exception");
           updateStop(stop);
         }
         if(stop.getStatus() == StopStatus.Canceled)
         {
+          LOG.info("Stop status is canceled" + " "+ stopName) ;
           Stop preStop = null; //stop.getSequenceNumber()>=1?stops.get(stop.getSequenceNumber()-1):null;
           Stop postStop = null; // stops.size()>stop.getSequenceNumber() + 1?stops.get(stop.getSequenceNumber()+1):null;
           if(!routeNameOfCanceledStop.equals(""))
@@ -215,6 +257,15 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
               postStop = stops.get(sequenceOfCanceledStop+1);
             }
           }
+          if(!route.equals(""))
+          {
+        	  List<Stop> stops = stopsManager.getStopsByRouteName(routeNameOfCanceledStop);
+        	  if(sequenceOfCanceledStop >=1 && sequenceOfCanceledStop < stops.size()-1)
+        	  {
+        		  preStop = stops.get(sequenceOfCanceledStop-1);
+        		  postStop = stops.get(sequenceOfCanceledStop+1);
+        	  }
+          }
           
           // Canceled
           DefaultStop defaultStop = new DefaultStop(stop);
@@ -222,6 +273,7 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
           defaultStop.setSequenceNumber(0);
           stop = defaultStop;
           Stop updatedStop = stopsManager.addOrReplaceStop(stop);
+          LOG.info("Updating stop" + " "+ stopName);
           updateStop(updatedStop);
           
           // if the canceled stop has breaks before and after
@@ -242,7 +294,7 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
           }
           if(!routeNameOfCanceledStop.equals(stopsManager.getUnassignedRouteName()))
             updateRoute(routeNameOfCanceledStop, false, true, requestId);
-          if(previoudStatus == StopStatus.Dispatched || previoudStatus == StopStatus.AtStop)
+          if(previousStatus == StopStatus.Dispatched || previousStatus == StopStatus.AtStop)
           {
             sendCancelMessage(stop, routeNameOfCanceledStop);
           }
@@ -295,7 +347,7 @@ public class StopProcessor extends GeoEventProcessorBase implements EventProduce
     return "";
   }
   
-  private String getRouteOfCanceledStop(String stopName)
+  private String getRouteOfStop(String stopName)
   {
     Stop stop = stopsManager.getStopByName(stopName);
     if(stop != null)

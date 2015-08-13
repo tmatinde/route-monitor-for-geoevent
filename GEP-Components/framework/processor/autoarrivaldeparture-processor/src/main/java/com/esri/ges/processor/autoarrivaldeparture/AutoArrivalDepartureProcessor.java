@@ -1,6 +1,8 @@
 package com.esri.ges.processor.autoarrivaldeparture;
 
+import java.util.Arrays;
 import java.util.Date;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,7 +29,14 @@ import com.esri.ges.manager.stops.StopStatus;
 import com.esri.ges.manager.stops.StopsManager;
 import com.esri.ges.manager.vehicles.Vehicle;
 import com.esri.ges.manager.vehicles.VehiclesManager;
+import com.esri.ges.messaging.EventDestination;
+import com.esri.ges.messaging.EventProducer;
+import com.esri.ges.messaging.EventUpdatable;
+import com.esri.ges.messaging.GeoEventProducer;
+import com.esri.ges.messaging.Messaging;
+import com.esri.ges.messaging.MessagingException;
 import com.esri.ges.processor.CacheEnabledGeoEventProcessor;
+import com.esri.ges.processor.GeoEventProcessorBase;
 import com.esri.ges.processor.GeoEventProcessorDefinition;
 import com.esri.ges.registry.condition.ConditionRegistry;
 import com.esri.ges.spatial.Geometry;
@@ -36,7 +45,7 @@ import com.esri.ges.spatial.Point;
 import com.esri.ges.util.DateUtil;
 import com.esri.ges.util.Validator;
 
-public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
+public class AutoArrivalDepartureProcessor extends GeoEventProcessorBase implements  EventProducer, EventUpdatable
 {
   private static final Log log = LogFactory.getLog( AutoArrivalDepartureProcessor.class );
   private StopsManager stopsManager;
@@ -47,6 +56,11 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
   private AutoArrivalDepartureManager autoArrivalDepartureManager;
 //  private final Map<String, String> incidentIDMapper = new ConcurrentHashMap<String, String>();
   private VehiclesManager vehiclesManager;
+  private GeoEventProducer geoEventProducer;
+  private EventDestination destination;
+  private Messaging messaging;
+  
+
   
   private class StopIncidentConditions
   {
@@ -59,7 +73,8 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
                            RouteManager routeManager,
                            VehiclesManager vehiclesManager,
                            ConditionRegistry conditionRegistry,
-                           AutoArrivalDepartureManager autoArrivalDepartureManager) throws ComponentException
+                           AutoArrivalDepartureManager autoArrivalDepartureManager,
+                           Messaging messaging) throws ComponentException
   {
     super(definition);
     this.stopsManager = stopsManager;
@@ -67,6 +82,7 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
     this.routeManager = routeManager;
     this.conditionRegistry = conditionRegistry;
     this.autoArrivalDepartureManager = autoArrivalDepartureManager;
+    this.messaging = messaging;
   }
 
   @Override
@@ -84,21 +100,72 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
     }
     return null;
   }
-
+  
   @Override
-  public GeoEvent process(GeoEvent geoEvent) throws Exception
+  public GeoEvent process(GeoEvent geoEvent) throws Exception {
+	  String trackId = (String) geoEvent.getField("TRACK_ID");
+	  log.info("Processing TRACK_ID" + trackId);
+	  Stop stop = getNextStop(trackId);
+	  if(stop != null) {
+		  log.info(trackId + " Processing stop " + stop);
+	  }
+	  stop = process2(geoEvent, stop);
+	  if(stop != null) {
+		  log.info(trackId + " Processed stop " + stop);
+	  }
+	  List<Stop> stops = new LinkedList<Stop>();
+	  stops.add(stop);
+	  //if(stop.getSequenceNumber() == 0) {
+		  
+	  Stop stop1 = getNextStop(trackId);
+	 
+	  if(stop1.getSequenceNumber() != stop.getSequenceNumber()) {
+		  // Helps when in intersecting geofence.
+		  log.info(trackId + "=" + "previous sequence = " + stop.getSequenceNumber()+ 
+				  "next sequence " + stop1.getSequenceNumber() + " . starting processing again");
+		  stop1 = process2(geoEvent, stop1);
+		  stops.add(stop1);
+	  }
+	  //}
+	  
+	  log.info(trackId + " Returning stops " + stops);
+	  
+	  for(Stop stopIter: stops) {
+		  GeoEvent g = stopsManager.createGeoEvent(stopIter, this.getId(), 
+			  this.getDefinition().getUri());
+		  log.info(trackId + " sending stop " + stopIter);
+		  this.send(g);
+	  }
+	  return geoEvent;
+  }
+
+  
+  public Stop process2(GeoEvent geoEvent, Stop stop) throws Exception
   {
     Date eventTime = (Date) geoEvent.getField("TIME_START");
-    String trackId = (String) geoEvent.getField("TRACK_ID");
-    Stop stop = getNextStop(trackId);
-    if (stop == null)
+	String trackId = (String) geoEvent.getField("TRACK_ID");
+    if (stop == null) // T.M. Will be excuding assigned
     {
-      log.error( "Couldn't update ETA for track "+trackId+" because the next stop was not found." );
+      log.error( "Couldn't process for track "+trackId+" because the next stop was not found." );
       return null;
     }
+    if (stop.getStatus() == StopStatus.Assigned) // T.M. Will be excuding assigned
+    {
+    	log.error( "Couldn't process stop = " + stop + " because stop is assigned" );
+    	return null;
+    }
+    
+    // T.M. This has been added to cut off
+    if(stop.getStatus()==StopStatus.Completed || stop.getStatus()==StopStatus.Exception) {
+    	 this.processClosedStop(stop, eventTime);
+    	 log.info("This stop has been processed");
+    	 return stop;
+    }
+    
     
     String incidentCacheKey = buildIncidentCacheKey(geoEvent);
-    if( incidentCacheKey != null )
+    log.info("incidentCacheKey " + incidentCacheKey);
+    if( false )//incidentCacheKey != null ) // Short cutting autoarrival
     {
 //      String guid = incidentIDMapper.get( incidentCacheKey );
       String guid = autoArrivalDepartureManager.getIncidentId(incidentCacheKey);
@@ -108,11 +175,13 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
       {
         autoArrivalDepartureManager.updateIncident( guid, geoEvent );
         incident = autoArrivalDepartureManager.getIncidentById(guid);
+        log.info("Found Incident in cache for" + stop.getName());
       }
       else
       {
         if( conditions == null )
         {
+          log.info("Creating Open Spatial Condition For Stop");	
           conditions = createOpenSpatialConditionForStop( stop );
           stopConditions.put( stop.getName(), conditions );
         }
@@ -122,41 +191,75 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
                                                    IncidentType.Cumulative, AlertType.Notification, 
                                                    com.esri.ges.core.incident.GeometryType.Point, conditions.open, 
                                                    conditions.close, geoEvent.getGeoEventDefinition().getOwner(), definition.getUri(), 3600, geoEvent, incidentCacheKey);
-//          incidentIDMapper.put( incidentCacheKey, incident.getId() );
+
+          log.info("Creating incident after evaluating open" + stop.getName());
+          //          incidentIDMapper.put( incidentCacheKey, incident.getId() );
           if(stop.getStatus()==StopStatus.Dispatched || stop.getStatus()==StopStatus.Assigned)
           {
             stop.setActualArrival( eventTime );
             stop.setStatus( StopStatus.AtStop );
+            log.info("Setting stop as AtStop" + stop.getName());
           }
         }
       }
-      if (incident != null)
+      log.info("Incident " + incident);
+      if (incident != null || stop.getSequenceNumber() == 0 || 
+    	  stop.getStatus()==StopStatus.Completed || stop.getStatus()==StopStatus.Exception)
       {
-        if( conditions.close.evaluate(geoEvent) || stop.getStatus()==StopStatus.Completed || stop.getStatus()==StopStatus.Exception)
+	    if(stop.getSequenceNumber() == 0) {
+			// TODO: T.M. Should we reset the base locationstop.getStatus() == StopStatus.AtStopbase
+			stop.setStatus(StopStatus.Completed);
+			log.info("stop sequence number = 0 Setting stop status to completed " + stop);
+		}  
+    	log.info("Checking if close condition is true " + conditions.close.evaluate(geoEvent));
+        if(stop.getStatus()==StopStatus.Completed || stop.getStatus()==StopStatus.Exception  || conditions.close.evaluate(geoEvent) )
         {
+          log.info("Closing geofence for " + stop);
 //          incidentIDMapper.remove( incidentCacheKey );
 //          incidentManager.closeIncident( guid, geoEvent );
           autoArrivalDepartureManager.closeIncident(incidentCacheKey, geoEvent);
-          stopConditions.remove(stop.getName());
-          Vehicle vehicle = vehiclesManager.getVehicleByName( stop.getRouteName() );
-          vehicle.setNextStopSequenceNumber( stop.getSequenceNumber()+1 );
-
-          if(stop.getStatus()==StopStatus.AtStop)
-          {
-            stop.setActualDeparture( eventTime );
-            stop.setActualServiceDuration( (int)DateUtil.minutesBetween( stop.getActualArrival(), eventTime ) );
-            stop.setStatus( StopStatus.Completed );
-            
-          }
+          this.processClosedStop(stop, eventTime);
           
         }
       }
-    }
+    } /*else if(stop.getSequenceNumber() == 0 && 
+    		  (stop.getStatus() == StopStatus.AtStop ||
+    		  stop.getStatus() == StopStatus.Dispatched))  {
+    	stop.setStatus(StopStatus.Completed);
+		log.info("Setting stop status to completed " + stop);
+		this.processClosedStop(stop, eventTime);
+    }*/
     stop.setLastUpdated(eventTime);
     cacheGeoEventWithVehichleResource( geoEvent, trackId );
-    return createGeoEvent(stop);
+    return stop;
   }
 
+  private void processClosedStop(Stop stop, Date eventTime) {
+	  if(stop.getStatus()==StopStatus.Completed || 
+	     stop.getStatus()==StopStatus.Exception ||
+	     stop.getStatus()==StopStatus.AtStop)
+      {
+		  // Question. Should we automatically move to next stop if the stops is AtStop
+		  // or wait for completion of stop?.
+		  
+//        incidentIDMapper.remove( incidentCacheKey );
+//        incidentManager.closeIncident( guid, geoEvent );
+        
+        stopConditions.remove(stop.getName());
+        Vehicle vehicle = vehiclesManager.getVehicleByName( stop.getRouteName() );
+        vehicle.setNextStopSequenceNumber( stop.getSequenceNumber()+1 );
+        log.info("Set vehicle next sequence number "+ vehicle.getNextStopSequenceNumber());
+        //if(stop.getStatus()==StopStatus.AtStop)
+        //{
+          stop.setActualDeparture( eventTime );
+          stop.setActualServiceDuration( (int)DateUtil.minutesBetween( stop.getActualArrival(), eventTime ) );
+          //stop.setStatus( StopStatus.Completed ); TM: Removing autoComplete
+          log.info("closing out stop durations" + stop);
+        //}
+        
+      }
+	  
+  }
   private void cacheGeoEventWithVehichleResource(GeoEvent geoEvent, String trackId)
   {
     Route route = routeManager.getRouteByName( trackId );
@@ -188,7 +291,21 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
     return stopsManager.createGeoEvent(stop, "arcgis", definition.getUri() );
   }
 
-  private Stop getNextStop(String trackId)
+  /*private Stop getNextStop(String trackId, boolean forceReset) {
+	  
+  }*/
+  
+  private Stop getNextStop(String trackId) {
+	  return getNextStop(trackId, true );
+  }
+  
+  /**
+   * Returns next stop that is not in assigned
+   * 
+   * @param trackId
+   * @return
+   */
+  private Stop getNextStop(String trackId, boolean firstRun)
   {
     Vehicle vehicle = vehiclesManager.getVehicleByName( trackId );
     List<Stop> stopsForVehicle = stopsManager.getStopsByRouteName( trackId );
@@ -196,13 +313,39 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
     {
       return null;
     }
-    if(vehicle.getNextStopSequenceNumber()==null)
+    log.info("vehicle.getNextStopSequenceNumber()" + vehicle.getNextStopSequenceNumber());
+    if(vehicle.getNextStopSequenceNumber()==null) {
+      log.info("Reset vehicle next sequenceNumber");
       resetVehicleNextSequenceNumber();
-    Integer nextStopSequenceNumber = vehicle.getNextStopSequenceNumber();
-    if( nextStopSequenceNumber > stopsForVehicle.size() )
-    {
-      return null;
     }
+    Integer nextStopSequenceNumber = vehicle.getNextStopSequenceNumber();
+    if(firstRun == false) {
+    	nextStopSequenceNumber = 0;
+    }
+	for (; nextStopSequenceNumber <= stopsForVehicle.size(); nextStopSequenceNumber++) {
+		if (nextStopSequenceNumber >= stopsForVehicle.size()) {
+			if (firstRun == true) {
+				return getNextStop(trackId, false);
+			}
+			log.debug("returning null stop trackid = " + trackId
+					+ "nextStopSequenceNumber=" + nextStopSequenceNumber
+					+ " > stopsForVehicle.size()=" + stopsForVehicle.size());
+			vehicle.setNextStopSequenceNumber(null);
+			return null;
+		}
+		Stop stop = stopsForVehicle.get(nextStopSequenceNumber);
+		if (stop.getStatus() == StopStatus.Completed ||
+		    stop.getStatus() == StopStatus.Exception ||
+		    stop.getStatus() == StopStatus.Assigned || 
+		    (stop.getStatus() == StopStatus.AtStop && stop.getActualDeparture() != null)) {
+			continue;
+		}  else {
+			break;
+
+		}
+	}
+    vehicle.setNextStopSequenceNumber(nextStopSequenceNumber);
+    log.info("Processed next stop (getNextStop)" + nextStopSequenceNumber);
     return stopsForVehicle.get( nextStopSequenceNumber );
   }
   
@@ -230,13 +373,13 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
       condition.setGeofence( geoFenceString );
       condition.setOperator( SpatialOperator.INSIDE );
       condition.setOperand("GEOMETRY");
-      condition.setGeoEventCache( geoEventCache );
+      //condition.setGeoEventCache( geoEventCache );
       retConditions.open = condition;
       condition = (SpatialCondition)service.create();
       condition.setGeofence( geoFenceString );
       condition.setOperator( SpatialOperator.OUTSIDE );
       condition.setOperand("GEOMETRY");
-      condition.setGeoEventCache( geoEventCache );
+     // condition.setGeoEventCache( geoEventCache );
       retConditions.close = condition;
     }
     catch( Exception e)
@@ -247,8 +390,52 @@ public class AutoArrivalDepartureProcessor extends CacheEnabledGeoEventProcessor
   }
   
   @Override
+  public void send(GeoEvent msg) throws MessagingException
+  {
+    if(geoEventProducer == null)
+    {
+      if(messaging == null)
+      {
+        log.error("Messaging is null.  Unable to create geoEventProducer.");
+        return;
+      }
+      destination = new EventDestination(getId() + ":event");
+      geoEventProducer = messaging.createGeoEventProducer(destination.getName());
+      if(geoEventProducer == null)
+      {
+        log.error("Unable to create geoEventProducer.");
+        return;
+      }
+    }
+    log.info("GeoEventProducer Senging " + msg);
+    geoEventProducer.send(msg);
+  }
+  
+ /* @Override
   public boolean isCacheRequired()
   {
     return false;
+  }*/
+  
+  @Override
+  public List<EventDestination> getEventDestinations()
+  {
+    return Arrays.asList(destination);
   }
+
+  @Override
+  public EventDestination getEventDestination()
+  {
+    return destination;
+  }
+  
+  @Override
+  public void setId(String id)
+  {
+    super.setId(id);
+    destination = new EventDestination(getId() + ":event");
+    geoEventProducer = messaging.createGeoEventProducer(destination.getName());
+    log.info("Setting id = " + id + " destination and geoeventProducer done");
+  }
+
 }

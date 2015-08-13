@@ -221,6 +221,7 @@ public class RouteManagerImpl implements RouteManager
       {
         if( !stop.isServiced() )
         {
+          // TODO: What happens when route is dispatched and you have an assigned?
           notServicedLocations.add( convertStopToLocation( stop ) );
         }
         else
@@ -233,19 +234,29 @@ public class RouteManagerImpl implements RouteManager
       }
       
       // put two lists together
-      if(routeWithStops.getStops().get(0).isServiced() || (!routeWithStops.getStops().get(0).isServiced() && !routeWithStops.getStops().get(0).getType().equals(NonServiceStopType.Base)))
+      if(routeWithStops.getStops().get(0).isServiced() || 
+        (!routeWithStops.getStops().get(0).isServiced() && 
+         !routeWithStops.getStops().get(0).getType().equals(NonServiceStopType.Base.toString())))
       {
+    	log.info("Adding current location stop 0 = " + routeWithStops.getStops().get(0));
         //If vehicle started moving, current location may be needed.  If vehicle has not completed the start/base, current location is not needed.
         addCurrentLocation(notServicedLocations, routeWithStops, servicedStops);
       }
-      locations.addAll(notServicedLocations);
+      log.info("Serviced Stops = " + servicedStops + " , Not serviced Locations" + notServicedLocations);
+      locations.addAll(notServicedLocations); 
       
       updateSequenceNumbers( locations );
       startTime = constructStartTime(routeWithStops, servicedStops);
       solvedRoute = networkAnalystServerConnection.solveRoute(routeSolverPath, locations, routeWithStops.isOptimize(), startTime );
       addSolvedRouteToPlan( plan, solvedRoute, servicedStops.size(), startTime );
       //Add previously serviced Stops
-      plan.getStops().addAll( servicedStops );
+      Vehicle vehicle = vehiclesManager.getVehicleByName( routeWithStops.getVehicleName() );
+      Stop stop = plan.getStops().get(0);
+      if(stop != null && vehicle != null) {
+    	  log.info("Setting next stop sequence number for to " + stop.getSequenceNumber() +
+    			  ", vehicle = " + vehicle.getVehicleName());
+      }
+      plan.getStops().addAll(0, servicedStops ); // T.M. Adding all serviced stops to the beginning
     }
     
     return plan;
@@ -255,53 +266,64 @@ public class RouteManagerImpl implements RouteManager
   {
     if(routeWithStops.getCurrentLocation() != null)
     {
-      locations.add( createLocationForPoint( routeWithStops.getCurrentLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
+      log.info("Creating currentlocation from routeWithStops.getCurrentLocation()");
+      locations.add(0, createLocationForPoint( routeWithStops.getCurrentLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
     }
     else
     {
       if (servicedStops.size()==0)
       {
+    	log.info("Creating currentlocation from first stop " +  routeWithStops.getStops().get(0));
         // Use 1st stop location
-        locations.add( createLocationForPoint( routeWithStops.getStops().get(0).getLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
+        locations.add(0, createLocationForPoint( routeWithStops.getStops().get(0).getLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
       }
       else
       {
+    	log.info("Creating currentlocation from last serviced stop " +  servicedStops.get(servicedStops.size()-1));   
         // Use last serviced stop location
         // Enhancement opportunity:  Sort stops by actual departure
-        locations.add( createLocationForPoint( servicedStops.get(servicedStops.size()-1).getLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
+        locations.add(0, createLocationForPoint( servicedStops.get(servicedStops.size()-1).getLocation(), currentLocationName, routeWithStops.getRouteName(), 1 ) );
       }
     }
   }
   
   private Date constructStartTime(RouteWithStops routeWithStops, List<Stop> servicedStops)
   {
-    if(routeWithStops.getCurrentTimeStamp() != null)
+    if(routeWithStops.getCurrentTimeStamp() != null) {
+    	log.info("Get Start Time " + routeWithStops.getCurrentTimeStamp());
       return routeWithStops.getCurrentTimeStamp();
-    else
-    {
+      
+    } else {
       if (servicedStops.size()==0)
       {
+        log.info("Serviced Stops = 0 routeWithStops.getStops().get(0).getProjectedArrival() )" +
+        		routeWithStops.getStops().get(0).getProjectedArrival());
         return routeWithStops.getStops().get(0).getProjectedArrival();
       }
       else
       {
+    	  log.info("Serviced Stops size  = " + servicedStops.size() 
+    			  + " servicedStops.get(servicedStops.size()-1).getActualDeparture() )" +
+    			  servicedStops.get(servicedStops.size()-1).getActualDeparture());  
         return servicedStops.get(servicedStops.size()-1).getActualDeparture();
       }
     }
   }
 
-  private StopStatus getNewStopStatus(String routeName)
+  private StopStatus getNewStopStatus(String routeName, boolean stopChangedRoute)
   {
+	
     Route route = getRouteByName(routeName);
     if(route != null)
     {
       if(route.getRouteName().equals(stopsManager.getUnassignedRouteName()))
       {
         return StopStatus.Unassigned;
-      }
-      else
-      {
-        if(route.getDispatchAck() != null && (route.getDispatchAck().equals(RouteStatus.Acknowledged.toString()) || route.getDispatchAck().equals(RouteStatus.Dispatched.toString())))
+      } else if(stopChangedRoute == true) {
+    	  return StopStatus.Assigned;
+      } else {
+        if(stopChangedRoute == false &&
+           (route.getDispatchAck() != null && (route.getDispatchAck().equals(RouteStatus.Acknowledged.toString()) || route.getDispatchAck().equals(RouteStatus.Dispatched.toString()))))
         {
           return StopStatus.Dispatched;
         }
@@ -316,6 +338,7 @@ public class RouteManagerImpl implements RouteManager
  
   private void updateSequenceNumbers(ArrayList<Location> locations )
   {
+	log.info("Updating sequences " + locations);
     Integer sequence = 1;
     for( Location location : locations )
     {
@@ -344,6 +367,7 @@ public class RouteManagerImpl implements RouteManager
       for( Location location : locations )
       {
         newStop = mergeWithStopInfo( location, startingSequenceNumber, firstInRoutesLeft, startTime, prevTotalServiceTime );
+        log.info("Adding stop to plan" + newStop);
         if( newStop != null )
         {
           stopsFromPlan.add( newStop );
@@ -381,6 +405,15 @@ public class RouteManagerImpl implements RouteManager
     return routeCopy;
   }
 
+  /**
+   * 
+   * @param location From route solve
+   * @param sequenceNumber
+   * @param firstInUpdateSequence
+   * @param startTime
+   * @param prevTotalServiceTime
+   * @return
+   */
   private Stop mergeWithStopInfo(Location location, int sequenceNumber, boolean firstInUpdateSequence, Date startTime, int prevTotalServiceTime)
   {
     Map<String, Object> attributes = location.getAttributes();
@@ -391,17 +424,39 @@ public class RouteManagerImpl implements RouteManager
     }
 
     Stop stop = stopsManager.getStopByName(stopName);
+   
     if (stop == null)
     {
       throw new RuntimeException("Couldn't find stop " + stopName);
     }
+    if(stop.getStatus() == StopStatus.Canceled) {
+     log.info("Found stop to be canceled. Skipping ..." + stop.getName());
+      return null;	
+    }
+    // TODO. TM  Seems like a race problem resetting the route
     DefaultStop stopCopy = new DefaultStop(stop);
     stopCopy.setRouteName((String) attributes.get("RouteName"));
     stopCopy.setSequenceNumber(sequenceNumber);
     stopCopy.setScheduledDeparture(null);
-    stopCopy.setStatus(getNewStopStatus(stopCopy.getRouteName()));
+    boolean isChangedRoute = !stopCopy.getRouteName().toString().equals(stop.getRouteName().toString());
+    if(isChangedRoute == true) {
+      stopCopy.setStatus(getNewStopStatus(stopCopy.getRouteName(), isChangedRoute));
+    }
+   
+    log.info("stop original = " + stop.toString() + " , " +
+    		"stop copy = " + stopCopy.toString());
+    
     Number cumulativeTime = (Number) attributes.get("Cumul_Time");
+    if(cumulativeTime == null) {
+       cumulativeTime = (Number) attributes.get("Cumul_TravelTime");
+    }
+    if(cumulativeTime == null) {
+    	throw new RuntimeException("Did not find Cumul_Time or Cumul_TravelTime in Location attributes");
+    }
+    log.info("startTime = " + startTime + ", cumulativeTime" + 
+       cumulativeTime + ", prevTotalServiceTime" + prevTotalServiceTime);
     Date peta = DateUtil.addMins(startTime, (cumulativeTime.intValue() + prevTotalServiceTime));
+    log.info("Date to put on stop" + peta);
     stopCopy.setProjectedArrival(peta);
     Integer scheduledDuration = stopCopy.getScheduledServiceDuration();
     if (scheduledDuration != null)
@@ -615,7 +670,7 @@ public class RouteManagerImpl implements RouteManager
         {
           // make sure we are not unassigning bases, lunch and breaks
           for(String stopName : param.getStops())
-          {
+          { log.info("Plan.calculate stopname = "+ stopName + ", stop = " + stopsManager.getStopByName(stopName));
             if(!isStopTypeService(stopsManager.getStopByName(stopName).getType()))
               errorMessages.add("Unassigning non-service stops is not allowed.");
           }
@@ -636,6 +691,8 @@ public class RouteManagerImpl implements RouteManager
         }
         location = vehicle.getLocation();
         locationTimestamp = vehicle.getLastUpdated();
+        log.info("Location Time Stamp = " + locationTimestamp +
+        		" routeName = " +routeName );
         if( location == null )
         {
           errorMessages.add( "No location for vehicle "+route.getVehicleName()+".  Don't know where to start route from." );
@@ -708,8 +765,12 @@ public class RouteManagerImpl implements RouteManager
             sequenceNumber = 1;
             for(Stop existingStop:existingStops)
             {
-              if( !(existingStop.getSequenceNumber()==0 && existingStop.getType().equals(NonServiceStopType.Base.toString())) && (existingStop.getStatus()==StopStatus.Assigned || existingStop.getStatus() == StopStatus.Dispatched) && newStops.size()>0 )
+              if( !(existingStop.getSequenceNumber()==0 && 
+            		  existingStop.getType().equals(NonServiceStopType.Base.toString())) && 
+            		  (existingStop.getStatus()==StopStatus.Assigned || 
+            		   existingStop.getStatus() == StopStatus.Dispatched) && newStops.size()>0 )
               {
+            	log.info("Adding new stops before " + existingStop + " newstops = " + newStops);
                 for(Stop newStop:newStops)
                 {
                   DefaultStop newStopCopy = new DefaultStop( newStop );
@@ -728,7 +789,7 @@ public class RouteManagerImpl implements RouteManager
               stopsForRoute.add( existingStopCopy );
             }
           }
-
+          log.info("New built route " + stopsForRoute);
           if(newStops.size()>0)
           {
             errorMessages.add( "Unable to insert stop(s) to route " + route.getRouteName() );
@@ -791,9 +852,9 @@ public class RouteManagerImpl implements RouteManager
       
       plan = calculate(routes, naConnection, routeSolverPath, commit);
     }
-    catch (Exception e)
+    catch (Throwable e)
     {
-      log.error(e);
+      log.error("Error in resequence", e);
       return createPlanGeoEvent(null, false, PlanStatus.Failed, e.getMessage());
     }
     

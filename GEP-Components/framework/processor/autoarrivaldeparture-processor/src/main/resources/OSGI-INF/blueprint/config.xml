@@ -7,6 +7,7 @@
     <reference id="autoArrivalDepartureManagerService" interface="com.esri.ges.manager.autoarrivaldeparture.AutoArrivalDepartureManager"/>
     
 	<reference id="planManagerService" interface="com.esri.ges.manager.plan.PlanManager" />
+	<reference id="messagingService" interface="com.esri.ges.messaging.Messaging" />
 
    	<bean id="autoArrivalDepartureProcessorBean" class="com.esri.ges.processor.autoarrivaldeparture.AutoArrivalDepartureProcessorService" activation="eager">
 		<property name="bundleContext" ref="blueprintBundleContext" />
@@ -15,6 +16,7 @@
         <property name="vehiclesManager" ref="vehiclesManagerService" />
         <property name="conditionRegistry" ref="conditionRegistryService" />
         <property name="autoArrivalDepartureManager" ref="autoArrivalDepartureManagerService" />
+        <property name="messaging" ref="messagingService" />
 	</bean>
 	<service id="autoArrivalDepartureProcessorService" ref="autoArrivalDepartureProcessorBean" interface="com.esri.ges.processor.GeoEventProcessorService"/>
 </blueprint>

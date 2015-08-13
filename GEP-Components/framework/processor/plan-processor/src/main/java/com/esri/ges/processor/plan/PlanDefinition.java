@@ -20,6 +20,8 @@ public class PlanDefinition extends GeoEventProcessorDefinitionBase
   public final static String ALERT_LAYER_INDEX_PROPERTY = "alertLayer";
   public final static String GEOFENCE_LAYER_INDEX_PROPERTY = "geofenceLayer";
 
+  public static final String MESSAGES_LAYER_INDEX_PROPERTY = "messagesLayer";
+
   public PlanDefinition()
   {
     try
@@ -32,6 +34,7 @@ public class PlanDefinition extends GeoEventProcessorDefinitionBase
       propertyDefinitions.put(VEHICLE_LAYER_INDEX_PROPERTY, new PropertyDefinition(VEHICLE_LAYER_INDEX_PROPERTY, PropertyType.ArcGISLayer, null, "Vehicle Layer", "Vehicle Layer.", true, false));
       propertyDefinitions.put(ALERT_LAYER_INDEX_PROPERTY, new PropertyDefinition(ALERT_LAYER_INDEX_PROPERTY, PropertyType.ArcGISLayer, null, "Alert Layer", "Alert Layer.", true, false));
       propertyDefinitions.put(GEOFENCE_LAYER_INDEX_PROPERTY, new PropertyDefinition(GEOFENCE_LAYER_INDEX_PROPERTY, PropertyType.ArcGISLayer, null, "GeoFence Layer", "GeoFence Layer.", true, false));
+      propertyDefinitions.put(MESSAGES_LAYER_INDEX_PROPERTY, new PropertyDefinition(MESSAGES_LAYER_INDEX_PROPERTY, PropertyType.ArcGISLayer, null, "Messages Layer", "Messages Layer.", true, false));
     }
     catch (Exception e)
     {

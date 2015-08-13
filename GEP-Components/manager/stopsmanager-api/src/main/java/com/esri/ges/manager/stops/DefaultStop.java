@@ -52,7 +52,12 @@ public class DefaultStop implements Stop
   public DefaultStop( Stop seed )
   {
     if( seed != null )
-    {
+    { //18556307113 887149
+      // TM Adding extra attributes to also be deep copied	
+      for( String key : seed.getAttributeKeys()) {
+    	  String value = seed.getAttribute(key);
+    	  this.attributes.put(key, value);
+      }
       setActualArrival( seed.getActualArrival() );
       setActualDeparture( seed.getActualDeparture() );
       setActualServiceDuration( seed.getActualServiceDuration() );
@@ -81,6 +86,7 @@ public class DefaultStop implements Stop
       setTimeWindowStart2( seed.getTimeWindowStart2() );
       setType( seed.getType() );
       setCumulativeMinutes( seed.getCumulativeMinutes() );
+     
     }
   }
 
@@ -460,6 +466,7 @@ public class DefaultStop implements Stop
   public String toString()
   {
     StringBuffer sb = new StringBuffer();
+    sb.append("DefaultStop = " );
     sb.append(routeName);
     sb.append("/");
     sb.append(name);
@@ -486,6 +493,10 @@ public class DefaultStop implements Stop
       sb.append("/"+DF.format(projectedDeparture));
     if (actualDeparture != null)
       sb.append("/"+DF.format(actualDeparture));
+    for( String key : this.getAttributeKeys()) {
+  	  String value = this.getAttribute(key);
+  	  sb.append("k=" + key + ",v=" + value );
+    }
     return sb.toString();
   }
 

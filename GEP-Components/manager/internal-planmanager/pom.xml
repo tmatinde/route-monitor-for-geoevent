@@ -69,5 +69,10 @@
 			<artifactId>autoarrivaldeparturemanager-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>com.esri.geovent.routemonitor.manager</groupId>
+			<artifactId>messagesmanager-api</artifactId>
+			<version>${project.version}</version>
+		</dependency>
 	</dependencies>
 </project>
