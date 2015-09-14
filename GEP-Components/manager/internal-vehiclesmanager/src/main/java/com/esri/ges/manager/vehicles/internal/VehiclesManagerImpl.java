@@ -157,20 +157,36 @@ public class VehiclesManagerImpl implements VehiclesManager
     }
     vehicleMap.put( vehicle.getVehicleName(), new VehicleResource( backingResource, spatial ) );  
   }
+  
+  
+  private void removeAllVehicles1(List<String> vNames, boolean isAll) {
+	  Set<String> vehicleKeys = vehicleMap.keySet();
+	  if( !Validator.isEmpty( vehicleKeys ) )
+	  {
+		  VehicleResource vehicle;
+		  for( String key : vehicleKeys )
+		  {
+			  if(isAll == true || (vNames != null && vNames.contains(key))) {
+			    vehicle = vehicleMap.remove( key );
+			    resourceManager.deleteResource( vehicle.getResource().getId() );
+			    log.info("deleting vehicle " + vehicle);
+			  } else {
+				log.info("Ignored removing vehicle with key = " + key);
+			  }
+		  }
+	  }
+	  
+  }
 
+  @Override
+  public void removeAllVehicles(List<String> vNames)
+  {
+	  this.removeAllVehicles1(vNames, false);
+  }
   @Override
   public void removeAllVehicles()
   {
-    Set<String> vehicleKeys = vehicleMap.keySet();
-    if( !Validator.isEmpty( vehicleKeys ) )
-    {
-      VehicleResource vehicle;
-      for( String key : vehicleKeys )
-      {
-        vehicle = vehicleMap.remove( key );
-        resourceManager.deleteResource( vehicle.getResource().getId() );
-      }
-    }
+    this.removeAllVehicles1(null, true);
   }
 
   @Override

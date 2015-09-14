@@ -17,6 +17,7 @@ public interface StopsManager
   public Stop addOrReplaceStop(Stop stop);
   public void batchAddOrReplaceStops( List<Stop> stops );
   public void removeAllStops();
+  public void removeAllStops(List<String> stopNames);
   public GeoEvent createGeoEvent(Stop stop, String ownerId, Uri uri);
   public GeoEvent createGeoEvent(List<Stop> stops, String ownerId, Uri uri);
   public GeoEvent createListGeoEvent(List<Stop> stops, String requestId, String ownerId, Uri uri);

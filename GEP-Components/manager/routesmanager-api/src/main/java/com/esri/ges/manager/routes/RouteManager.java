@@ -16,6 +16,7 @@ public interface RouteManager
   public void addOrReplaceRoute( Route route );
   public void removeRoute( String name );
   public void removeAllRoutes();
+  public void removeAllRoutes(List<String> routeNames);
   public Plan solveRoute( List<RouteWithStops> routesWithStops, String naConnection, String routeSolverPath );
   public Plan solveRouteAndCommit( List<RouteWithStops> routesWithStops, String naConnection, String routeSolverPath );
   public GeoEvent createGeoEvent( Route route, String ownerId, Uri uri);

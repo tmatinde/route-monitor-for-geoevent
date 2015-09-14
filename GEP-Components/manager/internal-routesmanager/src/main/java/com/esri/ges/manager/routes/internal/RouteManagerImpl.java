@@ -174,11 +174,34 @@ public class RouteManagerImpl implements RouteManager
       routes.remove( name );
     }
   }
+  
+  @Override
+  public void removeAllRoutes(List<String> routeNames) {
+	  removeAllRoutes1(routeNames, false);
+  }
 
+  
+  private void removeAllRoutes1(List<String> routeNames, boolean doAll)
+  {
+	  if(doAll) {
+		  routes.clear();		  
+	  } else if(routeNames != null){
+		  for(String routeName: routeNames) {
+			  if(routeName.toLowerCase().contains("_canceled") || 
+			     routeName.toLowerCase().contains("_cancelled") ||
+			     routeName.toLowerCase().contains("_unassigned")
+					  ) {
+				  continue;
+			  }
+			  routes.remove(routeName);
+		  }
+	  }
+  }
+  
   @Override
   public void removeAllRoutes()
   {
-    routes.clear();
+    this.removeAllRoutes1(null, true);
   }
   
   private Map<String,Object> createAttributesForLocation( Integer sequence, String stopName, String routeName )
@@ -227,7 +250,7 @@ public class RouteManagerImpl implements RouteManager
         else
         {
           log.info( "Stop "+stop.getName()+" has already been serviced.  Will not include it in updated route." );
-          DefaultStop stopCopy = new DefaultStop( stop );     
+          DefaultStop stopCopy = new DefaultStop( stop );      
           stopCopy.setSequenceNumber( servicedStops.size());
           servicedStops.add( stopCopy );
         }

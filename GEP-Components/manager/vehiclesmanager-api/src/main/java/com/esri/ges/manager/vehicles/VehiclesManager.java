@@ -13,6 +13,7 @@ public interface VehiclesManager
   public Vehicle getVehicleByName(String name);
   public void addOrReplaceVehicle(Vehicle vehicle);
   public void removeAllVehicles();
+  public void removeAllVehicles(List<String> vNames);
   public GeoEvent createGeoEvent(Vehicle vehicle, String ownerId, Uri uri);
   public Resource getResourceForVehicle(String name);
   public void clearAllVehicleFeatures(String agsConnectionName, String path, String featureService, String layer);

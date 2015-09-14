@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -214,8 +215,9 @@ public class StopsManagerImpl implements StopsManager
     return null;
   }
 
-  private Stop addOrReplaceInLocalMaps( Stop stop )
+  private synchronized Stop addOrReplaceInLocalMaps( Stop stop )
   {
+	  
     StopResource stopToInsert;
     if(stop instanceof StopResource)
     {
@@ -282,6 +284,7 @@ public class StopsManagerImpl implements StopsManager
   {
     String oldRouteName = stopToRouteNameMap.get( stopToInsert.getName() );
     ArrayList<StopResource> oldRouteStops = stopsByRouteName.get( oldRouteName );
+    
     int oldIndex = -1;
     Stop currStop;
     for( int i=0; i < oldRouteStops.size(); i++ )
@@ -323,20 +326,66 @@ public class StopsManagerImpl implements StopsManager
     return stopsByStopName.get( name );
   }
 
-
   @Override
-  public void removeAllStops()
+  public void removeAllStops() {
+	  this.removeAllStops1(null, true);
+  }
+    
+  @Override
+  public synchronized void removeAllStops(List<String> stopNames) {
+	  this.removeAllStops1(stopNames, false);
+  }
+
+  private synchronized void removeAllStops1(List<String> stopNames, boolean doAll)
   {
-    for(StopResource sr : stopsByStopName.values())
-    {
-      resourceManager.deleteResource(sr.getResource().getId());
+	log.info("Removing these stops " + stopNames+ ", doAll == " + doAll);
+	List <String> removeNames = new LinkedList<String>();
+	List <String> removeRoutes = new LinkedList<String>();
+	
+	if(stopsByStopName != null) {
+	    for(StopResource sr : stopsByStopName.values())
+	    {
+	      if(doAll == false && stopNames != null && stopNames.contains(sr.getName())) {
+	        removeNames.add(sr.getName());
+	        removeRoutes.add(sr.getRouteName());
+	        resourceManager.deleteResource(sr.getResource().getId());
+	      } else if (doAll == true) {
+	    	resourceManager.deleteResource(sr.getResource().getId());  
+	      }
+	    }
+	}
+    if(doAll == true) {
+	    stopsByRouteName.clear();
+	    stopsByStopName.clear();
+	    stopToRouteNameMap.clear();
+    } else {
+    	for(String routeName: removeRoutes) {
+    		if(routeName.equals(unassignedRouteName) || 
+    				routeName.equals(canceledRouteName)) {
+    			continue;
+    		}
+    		stopsByRouteName.remove(routeName);
+    	}
+    	log.info("Remaining stops by stopsByRouteName " + stopsByRouteName);
+    	for(String name: removeNames) {
+    		stopsByStopName.remove(name);
+    	}
+    	log.info("Remaining stops by stopsByStopName " + stopsByStopName);
+    	for(String name: removeNames) {
+    		stopToRouteNameMap.remove(name);
+    	}
+    	log.info("Remaining stops by stopToRouteNameMap " + stopsByStopName);
     }
-    stopsByRouteName.clear();
-    stopsByStopName.clear();
-    stopToRouteNameMap.clear();
+    
+    // TODO: for area of interest
     Map<String, Aoi> stopAois = aoiManager.searchAois( getStopsAoiCategory(), ".*" );
     for( Aoi aoi : stopAois.values() )
     {
+      if(doAll == false && stopNames != null && 
+    		  stopNames.contains(aoi.getName()) == false ) {
+    	  continue;
+      }
+      //log.info("Aoi Name " + aoi.getName() + " Category = " + aoi.getCategory());
       aoiManager.deleteAoi( aoi.getCategory(), aoi.getName() );
     }
   }

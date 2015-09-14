@@ -7,6 +7,8 @@
     <reference id="alertsManagerService" interface="com.esri.ges.manager.alerts.AlertsManager" />
     <reference id="messagingService" interface="com.esri.ges.messaging.Messaging"/>
     <reference id="messagesManagerService" interface="com.esri.ges.manager.messages.MessagesManager"/>
+    <reference id="agsConnectionManagerService" interface="com.esri.ges.manager.datastore.agsconnection.ArcGISServerConnectionManager"/>
+    <reference id="httpClientService" interface="com.esri.ges.core.http.GeoEventHttpClientService" />
     
 	<reference id="autoArrivalDepartureManagerService" interface="com.esri.ges.manager.autoarrivaldeparture.AutoArrivalDepartureManager"/>
     
@@ -33,6 +35,8 @@
         <property name="planGEDOwner" value="${com.esri.ges.manager.plan.geoeventdefinitionowner}" />
         <property name="planInputName" value="${com.esri.ges.manager.plan.planinputname}" />
         <property name="autoArrivalDepartureManager" ref="autoArrivalDepartureManagerService" />
+        <property name="agsConnectionManager" ref="agsConnectionManagerService" />
+        <property name="httpClientService" ref="httpClientService" />
     </bean>
     
     <service id="planManagerService" ref="planManagerBean" interface="com.esri.ges.manager.plan.PlanManager"/>

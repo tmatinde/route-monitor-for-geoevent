@@ -74,5 +74,31 @@
 			<artifactId>messagesmanager-api</artifactId>
 			<version>${project.version}</version>
 		</dependency>
+		<dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.2</version>
+        </dependency>
+        <dependency>
+            <groupId>com.esri.ges.manager</groupId>
+            <artifactId>agsconnectionmanager-api</artifactId>
+            <version>${project.version}</version>
+            <!-- scope>system</scope -->
+            <!-- systemPath>${project.basedir}/../../lib/agsconnectionmanager-api-10.2.2.jar</systemPath -->
+        </dependency>
+        <dependency>
+            <groupId>com.esri.ges.framework.datastore</groupId>
+            <artifactId>agsconnection-datastore</artifactId>
+            <version>${project.version}</version>
+            <!-- scope>system</scope -->
+            <!-- systemPath>${project.basedir}/../../lib/agsconnection-datastore-10.2.2.jar</systemPath -->
+        </dependency>
+        <dependency>
+            <groupId>com.esri.ges.framework.datastore</groupId>
+            <artifactId>datastore-api</artifactId>
+            <version>${project.version}</version>
+            <!-- scope>system</scope -->
+            <!-- systemPath>${project.basedir}/../../lib/datastore-api-10.2.2.jar</systemPath -->
+        </dependency>
 	</dependencies>
 </project>
