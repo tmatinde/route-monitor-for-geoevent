@@ -12,4 +12,6 @@ public interface RouteWithStops extends Route
   public Point getCurrentLocation();
   public Date getCurrentTimeStamp();
   public boolean isOptimize();
+  public boolean isIgnoreEndStopInRoutesolve();
+  
 }

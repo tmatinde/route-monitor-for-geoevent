@@ -3,6 +3,7 @@ package com.esri.ges.manager.stops;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import com.esri.ges.core.Uri;
 import com.esri.ges.core.geoevent.GeoEvent;
@@ -18,6 +19,7 @@ public interface StopsManager
   public void batchAddOrReplaceStops( List<Stop> stops );
   public void removeAllStops();
   public void removeAllStops(List<String> stopNames);
+  public GeoEvent createGeoEventStatusUpdate(Stop stop, String ownerId, Uri uri); 
   public GeoEvent createGeoEvent(Stop stop, String ownerId, Uri uri);
   public GeoEvent createGeoEvent(List<Stop> stops, String ownerId, Uri uri);
   public GeoEvent createListGeoEvent(List<Stop> stops, String requestId, String ownerId, Uri uri);
@@ -37,4 +39,5 @@ public interface StopsManager
   public List<Stop> reloadStops(String agsConnectionName, String path, String featureService, String layer);
   public void convertGeoEventToStop( GeoEvent message, Stop stop );
   public GeoEventDefinition getStopsGeoEventDefinition();
+  public void convertGeoEventToStop( GeoEvent message, Stop stop, Set<String> keys );
 }

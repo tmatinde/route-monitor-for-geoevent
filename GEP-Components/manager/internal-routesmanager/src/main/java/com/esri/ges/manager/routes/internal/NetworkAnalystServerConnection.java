@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
+import javax.xml.ws.Response;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
@@ -71,8 +73,15 @@ public class NetworkAnalystServerConnection
     this.http = http;
   }
 
-  public SolvedRoute solveRoute(String path, List<Location> locations, boolean optimize, Date startTime)
+  public SolvedRoute solveRoute(String path, List<Location> locations, boolean optimize, Date startTime, boolean ignoreEndStop)
   {
+	log.info("Solving route with ignoreEndStop/!rerouteToDepot = " + ignoreEndStop);
+	Location endStop = null;
+	if(ignoreEndStop) {
+		endStop = locations.get(locations.size() - 1);
+		locations.remove(locations.get(locations.size() - 1));
+		endStop.getAttributes().put("Cumul_TravelTime", 0);
+	}
     StringBuffer urlString = new StringBuffer();
     urlString.append( url.toExternalForm() );
     urlString.append( path );
@@ -83,8 +92,14 @@ public class NetworkAnalystServerConnection
     params.add( new KeyValue( "returnRoutes", "true" ) );
     params.add( new KeyValue( "returnStops", "true" ) );
     params.add( new KeyValue( "outputLines", "esriNAOutputLineTrueShape" ) );
-    params.add( new KeyValue( "preserveFirstStop", "true" ) );
-    params.add( new KeyValue( "preserveLastStop", "true" ) );
+    params.add( new KeyValue( "preserveFirstStop", "true" ) );  
+    params.add( new KeyValue( "impedance", "minutes" ) ); 
+    if(ignoreEndStop) {
+      params.add( new KeyValue( "preserveLastStop", "false" ) );
+    } else {
+      params.add( new KeyValue( "preserveLastStop", "true" ) ); 	
+    }
+    
     if(startTime != null)
       params.add( new KeyValue( "startTime", Long.toString(startTime.getTime()) ) );
     if( optimize )
@@ -120,7 +135,7 @@ public class NetworkAnalystServerConnection
       log.debug("reply = "+ reply);
       if( reply != null )
       {
-        return parseRouteSolverReply( reply );
+        return parseRouteSolverReply( reply, endStop );
       }
       log.error( "Did not get back a valid response from NA solve call. (response = null)" );
     }
@@ -131,7 +146,7 @@ public class NetworkAnalystServerConnection
     return null;
   }
   
-  private SolvedRoute parseRouteSolverReply(String reply)
+  private SolvedRoute parseRouteSolverReply(String reply, Location endStop)
   {
     SolvedRoute solvedRoute = null;
     ObjectMapper mapper = new ObjectMapper();
@@ -139,6 +154,9 @@ public class NetworkAnalystServerConnection
     {
       JsonNode response = mapper.readTree( reply );
       List<Location> locations = processStopsFromReply( getNodeFollowingPath( response, new Object[] { "stops"} ) );
+      if(endStop != null) {
+    	  locations.add(endStop);
+      }
       List<NamedGeometry> shapes = getGeometriesFromNAReply( getNodeFollowingPath( response, new Object[] { "routes" } ) );
       solvedRoute = new SolvedRoute();
       solvedRoute.setLocations( locations );
@@ -295,7 +313,7 @@ public class NetworkAnalystServerConnection
       {
         attributes.put( "Sequence", locationIndex );
       }
-      sb.append( ",\"attributes\":{" );
+      sb.append( ",\"attributes\":{" );  // 4 timewindow
       int index = 0;
       for( String key : attributes.keySet() )
       {
@@ -386,6 +404,7 @@ public class NetworkAnalystServerConnection
 	    HttpConnectionParams.setSoTimeout(httpparameters, sockettimeout * 10);
 
 	    HttpClient httpClient = new DefaultHttpClient(httpparameters);
+	    try {
 
 	  
 	    HttpRequestBase request = null;
@@ -408,6 +427,11 @@ public class NetworkAnalystServerConnection
 	      log.error("response = null from " + url + "postbody = " + postBody);
 	    } else {
 	    	return readResponseBody(response);
+	    }
+	    } finally {
+	    	if(httpClient !=null) {
+	    		
+	    	}
 	    }
 	    //context.setHttpResponse(response);
 	    return "";

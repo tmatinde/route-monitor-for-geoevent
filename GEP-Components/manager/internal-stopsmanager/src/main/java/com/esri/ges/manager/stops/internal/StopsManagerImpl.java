@@ -70,8 +70,17 @@ public class StopsManagerImpl implements StopsManager
   private String stopGEDName;
   private String stopsListGEDName;
   private String stopGEDOwner;
+  private String stopGEDStatusUpdate ="Route-Stop-Update-Status";
 
   
+  public String getStopGEDStatusUpdate() {
+	return stopGEDStatusUpdate;
+  }
+	
+  public void setStopGEDStatusUpdate(String stopGEDStatusUpdate) {
+		this.stopGEDStatusUpdate = stopGEDStatusUpdate;
+  }
+
   public void setStopsListGEDName(String stopsListGEDName)
   {
     this.stopsListGEDName = stopsListGEDName;
@@ -249,12 +258,27 @@ public class StopsManagerImpl implements StopsManager
       stopsForRoute = new ArrayList<StopResource>();
       stopsByRouteName.put(routeName, stopsForRoute);
     }
+    // TM Addedd.  Seems to be duplicating quite abit of stops
+    boolean duplicate = false;
+    for(Stop stopForRoute : stopsForRoute) {
+    	if(stopForRoute != null && 
+    			stopForRoute.getName().equals(stopToInsert.getName()) )  {
+    		duplicate = true;
+    	}
+    }
+    //
+    
     if( stopToInsert.getRouteName().equalsIgnoreCase( getUnassignedRouteName() ) )
     {
-      stopsForRoute.add(stopToInsert);
+      
+      if(duplicate == false) {
+    	log.info("Insert stops for route unassigned" + stopToInsert);  
+        stopsForRoute.add(stopToInsert);
+      }
     }
     else
     {
+      	
       ensureSize( stopsForRoute, stopToInsert.getSequenceNumber() + 2 );
       int insertIndex = stopToInsert.getSequenceNumber();
       if( stopsForRoute.get( insertIndex ) == null )
@@ -263,9 +287,12 @@ public class StopsManagerImpl implements StopsManager
       }
       else
       {
+    	log.info("Why are we adding duplicate = " + duplicate);  
         stopsForRoute.add( insertIndex, stopToInsert );
       }
+      log.info("Insert stops for route index =  " + insertIndex + " stop to insert " + stopToInsert);
     }
+    
     log.info("Inserting Stop" + stopToInsert);
     stopsByStopName.put( stopToInsert.getName(), stopToInsert );
     stopToRouteNameMap.put( stopToInsert.getName(), stopToInsert.getRouteName() );
@@ -282,11 +309,13 @@ public class StopsManagerImpl implements StopsManager
 
   private void removeStopFromRoute( StopResource stopToInsert )
   {
+	
     String oldRouteName = stopToRouteNameMap.get( stopToInsert.getName() );
     ArrayList<StopResource> oldRouteStops = stopsByRouteName.get( oldRouteName );
     
     int oldIndex = -1;
     Stop currStop;
+    ;
     for( int i=0; i < oldRouteStops.size(); i++ )
     {
       currStop = oldRouteStops.get( i );
@@ -299,6 +328,8 @@ public class StopsManagerImpl implements StopsManager
         }
       }
     }
+    log.info("removeStopFromRoute StopToRemove = " + stopToInsert.getName() + ", OldRouteName = " + oldRouteName + ", oldIndex = " + oldIndex + 
+    		"Old Routes Stop Size = " + oldRouteStops.size() );
     if( oldIndex != -1 )
     {
       List<StopResource> stopsToPreserve = oldRouteStops.subList( oldIndex+1, oldRouteStops.size() );
@@ -307,10 +338,19 @@ public class StopsManagerImpl implements StopsManager
       {
         if(stopToPreserve != null)
         {
-          stopToPreserve.setSequenceNumber( newSequenceNumber );
-          newSequenceNumber++;
+          if(!stopToInsert.getName().equals(stopToPreserve.getName()) &&
+        	  stopToPreserve.getRouteName().equals(oldRouteName)) {
+        	  
+            stopToPreserve.setSequenceNumber( newSequenceNumber );
+            newSequenceNumber++;
+            log.info("Set Sequence Number = " + newSequenceNumber + " for " + stopToPreserve.getName() + " routeName = " + stopToPreserve.getRouteName());	
+
+          } else {
+        	log.info("Should not be here name = "+ stopToPreserve.getName() + ", routename " + stopToPreserve.getRouteName());
+          }
         }
       }
+      
       oldRouteStops.remove( oldIndex );
     }
     else
@@ -437,13 +477,22 @@ public class StopsManagerImpl implements StopsManager
     }
     return geoEvent;
   }
-
+  
   @Override
-  public GeoEvent createGeoEvent(Stop stop, String ownerId, Uri uri)
+  public GeoEvent createGeoEvent(Stop stop, String ownerId, Uri uri) {
+	  return this.createGeoEvent(stop, ownerId, uri, stopGEDName);
+  }
+  
+  public GeoEvent createGeoEventStatusUpdate(Stop stop, String ownerId, Uri uri) {
+	  return this.createGeoEvent(stop, ownerId, uri, stopGEDStatusUpdate);
+  }
+  
+  
+  public GeoEvent createGeoEvent(Stop stop, String ownerId, Uri uri, String geoventName)
   {
     try
     {
-      GeoEvent geoEvent = geoEventCreator.create(stopGEDName, stopGEDOwner);
+      GeoEvent geoEvent = geoEventCreator.create(geoventName, stopGEDOwner);
       
       Set<String> predefinedTags = stop.getPredefinedKeys();
 
@@ -696,6 +745,7 @@ public class StopsManagerImpl implements StopsManager
           newStop.setStatus( StopStatus.Unassigned );
           newStop.setSequenceNumber(0);
           newStops.add( newStop );
+          
         }
       }
     }
@@ -853,6 +903,55 @@ public class StopsManagerImpl implements StopsManager
     return stops;
   }
   
+  /**
+   * Only update the keys given in the set
+   * 
+   * @param message
+   * @param stop
+   * @param keys
+   */
+  public void convertGeoEventToStop( GeoEvent message, Stop stop, 
+		  Set<String> keys )
+  {
+	  if(keys == null) {
+		  return;
+	  }
+	  Set<String> predefinedTags = stop.getPredefinedKeys();
+	  for (FieldDefinition fd :message.getGeoEventDefinition().getFieldDefinitions())
+	  {
+		  String name = fd.getName();
+		  Object value = message.getField(name);
+		  String resrouceName = getResourceName(fd, predefinedTags);
+		  
+		  if(value == null)
+		  {
+			  continue;
+		  }
+		  String valueToInsert;
+		  switch(fd.getType())
+		  {
+		  case Boolean:
+		  case Double:
+		  case Integer:
+		  case Long:
+		  case Short:
+		  case String:
+		  case Geometry:
+			  valueToInsert = value.toString();
+			  break;
+		  case Date:
+			  valueToInsert = Long.toString( ((Date)value).getTime() );
+			  break;
+		  default:
+			  valueToInsert = null;
+			  break; 
+			  
+		  }
+		  if(keys.contains(resrouceName) || keys.contains(name)) {
+			  stop.setAttribute( resrouceName, valueToInsert );
+		  }
+	  }
+  }
   public void convertGeoEventToStop( GeoEvent message, Stop stop )
   {
     Set<String> predefinedTags = stop.getPredefinedKeys();

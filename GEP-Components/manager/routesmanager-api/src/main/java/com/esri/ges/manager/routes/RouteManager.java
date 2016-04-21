@@ -28,5 +28,5 @@ public interface RouteManager
   public GeoEventDefinition getRouteDispatchGeoEventDefinition();
   public GeoEvent resequence(GeoEvent geoEvent, String naConnection, String routeSolverPath);
   public GeoEvent createPlanGeoEvent(Plan plan, boolean updateFeatures, PlanStatus status, String message);
-  public GeoEvent createUpdateRouteGeoEvent(String routeName, boolean optimize, boolean commit, String requestId, String ownerId, Uri ownerUri);
+  public GeoEvent createUpdateRouteGeoEvent(String routeName, boolean optimize, boolean commit, boolean includeLastStopInRouteSolve, String requestId, String ownerId, Uri ownerUri);
 }

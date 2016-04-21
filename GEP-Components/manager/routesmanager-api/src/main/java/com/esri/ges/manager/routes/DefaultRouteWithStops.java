@@ -12,19 +12,29 @@ public class DefaultRouteWithStops extends DefaultRoute implements RouteWithStop
   private Point currentLocation;
   private boolean optimize;
   private Date currentTimeStamp;
+  private boolean ignoreEndStopInRoutesolve;
   
-  public DefaultRouteWithStops()
+  public boolean isIgnoreEndStopInRoutesolve() {
+	return ignoreEndStopInRoutesolve;
+}
+
+public void setIgnoreEndStopInRoutesolve(boolean ignoreEndStopInRoutesolve) {
+	this.ignoreEndStopInRoutesolve = ignoreEndStopInRoutesolve;
+}
+
+public DefaultRouteWithStops()
   {
     super();
   }
   
-  public DefaultRouteWithStops( Route route, List<Stop> stops, Point currentLocation, Date currentTimeStamp, boolean optimize )
+  public DefaultRouteWithStops( Route route, List<Stop> stops, Point currentLocation, Date currentTimeStamp, boolean optimize,  boolean ignoreEndStopInRoutesolve )
   {
     super( route );
     setStops( stops );
     setCurrentLocation( currentLocation );
     setCurrentTimeStamp(currentTimeStamp);
     setOptimize(optimize);
+    setIgnoreEndStopInRoutesolve(ignoreEndStopInRoutesolve);
   }
   
   public void setStops( List<Stop> stops )
@@ -69,5 +79,7 @@ public class DefaultRouteWithStops extends DefaultRoute implements RouteWithStop
   {
     this.currentTimeStamp = currentTimeStamp;
   }
+  
+  
 
 }
